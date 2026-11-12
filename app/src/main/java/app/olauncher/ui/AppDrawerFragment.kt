@@ -226,7 +226,7 @@ class AppDrawerFragment : BaseFragment() {
             commandHandled = false
             val text = query?.toString().orEmpty()
             if (flag == Constants.FLAG_LAUNCH_APP && contactCommand == null) {
-                val command = ContactSearchCommand.parsePrefix(text, true)
+                val command = ContactSearchCommand.parsePrefix(text, commandEntryMode)
                 if (command != null) {
                     setCommandEntryMode(false)
                     selectSearchCategory(if (command.action != null) SearchCategory.CONTACTS else SearchCategory.ALL)
@@ -239,7 +239,7 @@ class AppDrawerFragment : BaseFragment() {
                     } else {
                         requestContactsPermission.launch(Manifest.permission.READ_CONTACTS)
                     }
-                    // Remove only the prefix; pasted commands can include a contact query.
+                    // Remove the command and its confirming space; preserve any following query.
                     setText(ContactSearchCommand.queryAfterPrefix(text))
                     setSelection(this.text?.length ?: 0)
                     return@doAfterTextChanged
