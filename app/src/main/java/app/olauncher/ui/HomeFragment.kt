@@ -146,10 +146,9 @@ class HomeFragment : BaseFragment(), View.OnClickListener, View.OnLongClickListe
 
     private fun initClickListeners() {
         binding.homeSearchBar.root.setOnClickListener { openHomeSearch() }
-        binding.homeSearchBar.homeThunder.setOnClickListener { openHomeSearch() }
+        binding.homeSearchBar.homeThunder.setOnClickListener { openHomeSearch(commandMode = true) }
         binding.homeSearchBar.homeThunder.setOnLongClickListener {
-            openHomeSearch(commandMode = true)
-            true
+            true // Long press intentionally does nothing.
         }
         binding.lock.setOnClickListener(this)
         // Home button for recents feature disabled
