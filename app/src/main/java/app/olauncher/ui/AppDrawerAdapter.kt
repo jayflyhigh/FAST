@@ -238,7 +238,9 @@ class AppDrawerAdapter(
 
     private fun dispatchSearch(rows: List<Row>, onResult: (AppModel?) -> Unit) {
         val contactsOnly = searchCategory == SearchCategory.CONTACTS
-        val app = rows.filterIsInstance<Row.App>().firstOrNull()?.model
+        // Enter opens the highlighted best-match app (the bottom app result), including in command mode.
+        val appRows = rows.filterIsInstance<Row.App>()
+        val app = (appRows.firstOrNull { it.isEnterTarget } ?: appRows.firstOrNull())?.model
         val contacts = rows.filterIsInstance<Row.Contact>()
         val contact = contacts.firstOrNull()?.model
         when {

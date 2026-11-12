@@ -71,6 +71,7 @@ class AppDrawerFragment : BaseFragment() {
     private var contactCommand: ContactSearchCommand? = null
     private var commandEntryMode = false
     private var commandHandled = false
+    private var appAutoOpened = false
     private var contactsLoaded = false
     private var contactsJob: Job? = null
     private val requestContactsPermission = registerForActivityResult(
@@ -124,6 +125,7 @@ class AppDrawerFragment : BaseFragment() {
         contactCommand = null
         commandEntryMode = false
         commandHandled = false
+        appAutoOpened = false
         contactsLoaded = false
         currentAppList = null
         currentPrivateSpaceApps = null
@@ -224,9 +226,10 @@ class AppDrawerFragment : BaseFragment() {
 
         doAfterTextChanged { query ->
             commandHandled = false
+            appAutoOpened = false
             val text = query?.toString().orEmpty()
             if (flag == Constants.FLAG_LAUNCH_APP && contactCommand == null) {
-                val command = ContactSearchCommand.parsePrefix(text, true)
+                val command = ContactSearchCommand.parsePrefix(text, commandEntryMode)
                 if (command != null) {
                     setCommandEntryMode(false)
                     selectSearchCategory(if (command.action != null) SearchCategory.CONTACTS else SearchCategory.ALL)
@@ -239,7 +242,7 @@ class AppDrawerFragment : BaseFragment() {
                     } else {
                         requestContactsPermission.launch(Manifest.permission.READ_CONTACTS)
                     }
-                    // Remove only the prefix; pasted commands can include a contact query.
+                    // Remove the command and its confirming space; preserve any following query.
                     setText(ContactSearchCommand.queryAfterPrefix(text))
                     setSelection(this.text?.length ?: 0)
                     return@doAfterTextChanged
@@ -262,7 +265,9 @@ class AppDrawerFragment : BaseFragment() {
                 query.isEmpty() -> true
                 query.isBlank() -> false
                 imeSubmit || enterKey -> {
-                    if (completedPress) submitSearch(query)
+                    // In command entry mode, the sole app match opens automatically.
+                    // Enter must not be required or used to launch it.
+                    if (completedPress && !commandEntryMode) submitSearch(query)
                     true
                 }
                 else -> false
@@ -380,6 +385,7 @@ class AppDrawerFragment : BaseFragment() {
                 if (flag == Constants.FLAG_LAUNCH_APP) {
                     showSearchResults(query)
                     maybeExecuteContactCommand(query)
+                    maybeAutoOpenUniqueApp(query)
                 }
             },
             appClickListener = ::selectApp,
@@ -576,6 +582,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun setCommandEntryMode(enabled: Boolean) = with(binding) {
         commandEntryMode = enabled
+        appAutoOpened = false
         val highlighted = enabled || contactCommand != null
         searchDivider.setBackgroundColor(if (highlighted) Color.BLACK else Color.WHITE)
         searchBar.setBackgroundResource(
@@ -647,6 +654,24 @@ class AppDrawerFragment : BaseFragment() {
             .singleOrNull()?.model ?: return
         if (contact.numbers.isEmpty()) return
         executeContactAction(contact, action)
+    }
+
+    private fun maybeAutoOpenUniqueApp(query: String) {
+        if (!commandEntryMode || contactCommand != null || appAutoOpened ||
+            query.isBlank() || flag != Constants.FLAG_LAUNCH_APP ||
+            _binding?.search?.text?.toString() != query ||
+            !viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        ) return
+
+        // Let users finish typing an alias and Space, even if the alias matches one app.
+        if (query.lowercase(java.util.Locale.ROOT) in setOf("p", "m", "wa", "w", "ai")) return
+
+        // Auto-open only the sole app match, never the best match of multiple results.
+        val apps = adapter.currentList.filterIsInstance<AppDrawerAdapter.Row.App>()
+        val app = apps.singleOrNull()?.model ?: return
+        appAutoOpened = true
+        adapter.cancelPendingSearchAction()
+        selectApp(app)
     }
 
     private fun executeContactAction(contact: DrawerContact, action: ContactAction) {
